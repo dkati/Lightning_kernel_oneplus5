@@ -1832,10 +1832,22 @@ static bool uuid_is_nonzero(__u8 u[16])
 static int f2fs_ioc_set_encryption_policy(struct file *filp, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
+	int err;
 
 	f2fs_update_time(F2FS_I_SB(inode), REQ_TIME);
 
 	return fscrypt_ioctl_set_policy(filp, (const void __user *)arg);
+
+	mutex_lock(&inode->i_mutex);
+
+	err = f2fs_process_policy(&policy, inode);
+
+	mutex_unlock(&inode->i_mutex);
+
+	return err;
+#else
+	return -EOPNOTSUPP;
+#endif
 }
 
 static int f2fs_ioc_get_encryption_policy(struct file *filp, unsigned long arg)
