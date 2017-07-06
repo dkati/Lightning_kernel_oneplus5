@@ -38,10 +38,6 @@
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 
-#ifdef CONFIG_POWERSUSPEND
-#include <linux/powersuspend.h>
-#endif
-
 /******************** Tunable parameters: ********************/
 
 /*
@@ -163,10 +159,6 @@ static struct workqueue_struct *smartmax_wq;
 static unsigned int ideal_freq;
 static bool is_suspended = false;
 static unsigned int min_sampling_rate;
-
-#ifdef CONFIG_POWERSUSPEND
-static struct power_suspend smartmax_power_suspend_handler;
-#endif
 
 #define LATENCY_MULTIPLIER			(1000)
 #define MIN_LATENCY_MULTIPLIER			(100)
@@ -805,24 +797,6 @@ static struct attribute_group smartmax_attr_group = {
 	.name = "smartmax",
 };
 
-#ifdef CONFIG_POWERSUSPEND
-static void smartmax_power_suspend(struct power_suspend *h)
-{
-	dprintk(SMARTMAX_DEBUG_SUSPEND, "%s\n", __func__);
-	ideal_freq = suspend_ideal_freq;
-	is_suspended = true;
-	smartmax_update_min_max_allcpus();
-}
-
-static void smartmax_power_resume(struct power_suspend *h)
-{
-	dprintk(SMARTMAX_DEBUG_SUSPEND, "%s\n", __func__);
-	ideal_freq = awake_ideal_freq;
-	is_suspended = false;
-	smartmax_update_min_max_allcpus();
-}
-#endif
-
 static int cpufreq_governor_smartmax(struct cpufreq_policy *new_policy,
 		unsigned int event) {
 	unsigned int cpu = new_policy->cpu;
@@ -860,9 +834,6 @@ static int cpufreq_governor_smartmax(struct cpufreq_policy *new_policy,
 				mutex_unlock(&dbs_mutex);
 				return rc;
 			}
-#ifdef CONFIG_POWERSUSPEND
-			register_power_suspend(&smartmax_power_suspend_handler);
-#endif
 			/* policy latency is in nS. Convert it to uS first */
 			latency = new_policy->cpuinfo.transition_latency / 1000;
 			if (latency == 0)
@@ -906,9 +877,6 @@ static int cpufreq_governor_smartmax(struct cpufreq_policy *new_policy,
 
 		if (!dbs_enable){
 			sysfs_remove_group(cpufreq_global_kobject, &smartmax_attr_group);
-#ifdef CONFIG_POWERSUSPEND
-			unregister_power_suspend(&smartmax_power_suspend_handler);
-#endif
 		}
 
 		mutex_unlock(&dbs_mutex);
@@ -968,11 +936,6 @@ static int __init cpufreq_smartmax_init(void) {
 		this_smartmax->cur_cpu_load = 0;
 		mutex_init(&this_smartmax->timer_mutex);
 	}
-
-#ifdef CONFIG_POWERSUSPEND
-	smartmax_power_suspend_handler.suspend = smartmax_power_suspend;
-	smartmax_power_suspend_handler.resume = smartmax_power_resume;
-#endif
 
 	return cpufreq_register_governor(&cpufreq_gov_smartmax);
 }
