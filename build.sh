@@ -12,8 +12,8 @@ KERNEL="Image.gz-dtb"
 DEFCONFIG="lightning_defconfig"
 
 # Kernel Details
-VER=Lightning-Kernel-V3
-VARIANT="OP5-OOS-N-V3"
+VER=Lightning-Kernel-V4
+VARIANT="OP5-OOS-N-V4"
 
 # Vars
 export LOCALVERSION=~`echo $VER`
