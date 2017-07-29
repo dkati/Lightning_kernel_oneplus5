@@ -178,6 +178,12 @@ config CPU_FREQ_GOV_SMARTMAX
         help
           'smartmax' combined ondemand and smartass2
 
+config CPU_FREQ_GOV_SMARTMAX_BIG
+        tristate "'smartmax_big' cpufreq policy governor"
+        select CPU_FREQ_TABLE
+        help
+          'smartmax_big' combined ondemand and smartass2
+
 config CPU_FREQ_GOV_POWERSAVE
 	tristate "'powersave' governor"
 	help
