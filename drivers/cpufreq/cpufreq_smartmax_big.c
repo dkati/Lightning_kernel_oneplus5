@@ -46,7 +46,7 @@
  * lowering the frequency towards the ideal frequency is faster than below it.
  */
 
-#define DEFAULT_SUSPEND_IDEAL_FREQ 1056000
+#define DEFAULT_SUSPEND_IDEAL_FREQ 576000
 #define DEFAULT_AWAKE_IDEAL_FREQ 576000
 #define DEFAULT_RAMP_UP_STEP 200000
 #define DEFAULT_RAMP_DOWN_STEP 200000
