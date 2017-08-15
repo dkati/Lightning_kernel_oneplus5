@@ -826,8 +826,6 @@ void wma_enable_sta_ps_mode(tp_wma_handle wma, tpEnablePsParams ps_req)
 			return;
 		}
 	}
-	/* power save request succeeded */
-	iface->in_bmps = true;
 }
 
 /**
@@ -841,7 +839,6 @@ void wma_disable_sta_ps_mode(tp_wma_handle wma, tpDisablePsParams ps_req)
 {
 	QDF_STATUS ret;
 	uint32_t vdev_id = ps_req->sessionid;
-	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
 
 	WMA_LOGD("Disable Sta Mode Ps vdevId %d", vdev_id);
 
@@ -851,7 +848,7 @@ void wma_disable_sta_ps_mode(tp_wma_handle wma, tpDisablePsParams ps_req)
 		WMA_LOGE("Disable Sta Mode Ps Failed vdevId %d", vdev_id);
 		return;
 	}
-	iface->in_bmps = false;
+
 	/* Disable UAPSD incase if additional Req came */
 	if (eSIR_ADDON_DISABLE_UAPSD == ps_req->psSetting) {
 		WMA_LOGD("Disable Uapsd vdevId %d", vdev_id);
@@ -1727,7 +1724,6 @@ QDF_STATUS wma_set_idle_ps_config(void *wma_ptr, uint32_t idle_ps)
 		WMA_LOGE("Fail to Set Idle Ps Config %d", idle_ps);
 		return QDF_STATUS_E_FAILURE;
 	}
-	 wma->in_imps = idle_ps;
 
 	WMA_LOGD("Successfully Set Idle Ps Config %d", idle_ps);
 	return QDF_STATUS_SUCCESS;
@@ -1764,7 +1760,6 @@ QDF_STATUS wma_set_smps_params(tp_wma_handle wma, uint8_t vdev_id,
 static void wma_set_vdev_suspend_dtim(tp_wma_handle wma, uint8_t vdev_id)
 {
 	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
-	uint32_t cfg_data_val = 0;
 
 	if ((iface->type == WMI_VDEV_TYPE_STA) &&
 	    (iface->dtimPeriod != 0)) {
@@ -1772,13 +1767,6 @@ static void wma_set_vdev_suspend_dtim(tp_wma_handle wma, uint8_t vdev_id)
 		uint32_t listen_interval;
 		uint32_t max_mod_dtim;
 		uint32_t beacon_interval_mod;
-
-		/* get mac to acess CFG data base */
-		struct sAniSirGlobal *mac = cds_get_context(QDF_MODULE_ID_PE);
-		if (!mac) {
-			WMA_LOGE(FL("Failed to get mac context"));
-			return;
-		}
 
 		if (wma->staDynamicDtim) {
 			listen_interval = wma->staDynamicDtim;
@@ -1814,20 +1802,12 @@ static void wma_set_vdev_suspend_dtim(tp_wma_handle wma, uint8_t vdev_id)
 					(max_mod_dtim * iface->dtimPeriod);
 			}
 		} else {
-			/* Set Listen Interval */
-			if ((wlan_cfg_get_int(mac, WNI_CFG_LISTEN_INTERVAL,
-				&cfg_data_val) != eSIR_SUCCESS)) {
-				QDF_TRACE(QDF_MODULE_ID_WMA,
-					  QDF_TRACE_LEVEL_ERROR,
-					"Failed to listen interval");
-				cfg_data_val =
-					POWERSAVE_DEFAULT_LISTEN_INTERVAL;
-			}
-			listen_interval = cfg_data_val;
+			return;
 		}
+
 		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-					      WMI_VDEV_PARAM_LISTEN_INTERVAL,
-					      listen_interval);
+						      WMI_VDEV_PARAM_LISTEN_INTERVAL,
+						      listen_interval);
 		if (QDF_IS_STATUS_ERROR(ret)) {
 			/* Even it fails continue Fw will take default LI */
 			WMA_LOGE("Failed to Set Listen Interval vdevId %d",
@@ -1837,31 +1817,30 @@ static void wma_set_vdev_suspend_dtim(tp_wma_handle wma, uint8_t vdev_id)
 		WMA_LOGD("Set Listen Interval vdevId %d Listen Intv %d",
 			 vdev_id, listen_interval);
 
-		if (wlan_cfg_get_int(mac,
-				     WNI_CFG_PS_WOW_DATA_INACTIVITY_TIMEOUT,
-				     &cfg_data_val) != eSIR_SUCCESS) {
-			QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_ERROR,
-				"Can't get WNI_CFG_PS_WOW_DATA_INACTIVITY_TO");
-			cfg_data_val = WOW_POWERSAVE_DEFAULT_INACTIVITY_TIME;
-		}
-
-		WMA_LOGD("%s: Set inactivity_time for wow: %d", __func__,
-				cfg_data_val);
+		/*
+		 * Set inactivity time to 50ms when DUT is in WoW mode.
+		 * It will be recovered to the cfg value when DUT resumes.
+		 *
+		 * The value 50ms inherits from Pronto. Pronto has different
+		 * inactivity for broadcast frames (worst case inactivity
+		 * is 50ms). 200ms Inactivity timer is applicable only to
+		 * unicast data traffic.
+		 */
+		WMA_LOGD("%s: Set inactivity_time to 50.", __func__);
 		ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
-				WMI_STA_PS_PARAM_INACTIVITY_TIME, cfg_data_val);
+					WMI_STA_PS_PARAM_INACTIVITY_TIME, 50);
 		if (ret)
 			WMA_LOGE("%s: Setting InActivity time Failed.",
 				__func__);
 
 		WMA_LOGD("%s: Set the Tx Wake Threshold 0.", __func__);
 		ret = wma_unified_set_sta_ps_param(
-				wma->wmi_handle, vdev_id,
-				WMI_STA_PS_PARAM_TX_WAKE_THRESHOLD,
-				WMI_STA_PS_TX_WAKE_THRESHOLD_NEVER);
+					wma->wmi_handle, vdev_id,
+					WMI_STA_PS_PARAM_TX_WAKE_THRESHOLD,
+					WMI_STA_PS_TX_WAKE_THRESHOLD_NEVER);
 		if (ret)
 			WMA_LOGE("%s: Setting TxWake Threshold Failed.",
 				__func__);
-
 		iface->restore_dtim_setting = true;
 	}
 }

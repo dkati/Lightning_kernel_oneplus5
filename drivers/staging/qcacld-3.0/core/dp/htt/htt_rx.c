@@ -2124,9 +2124,6 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 		QDF_NBUF_CB_TX_PACKET_TRACK(msdu) = QDF_NBUF_TX_PKT_DATA_TRACK;
 		QDF_NBUF_CB_RX_CTX_ID(msdu) = rx_ctx_id;
 		ol_rx_log_packet(pdev, peer_id, msdu);
-		if (qdf_nbuf_is_ipv4_arp_pkt(msdu))
-			QDF_NBUF_CB_GET_PACKET_TYPE(msdu) =
-				QDF_NBUF_CB_PACKET_TYPE_ARP;
 		DPTRACE(qdf_dp_trace(msdu,
 			QDF_DP_TRACE_RX_HTT_PACKET_PTR_RECORD,
 			qdf_nbuf_data_addr(msdu),
@@ -3351,7 +3348,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 				 &paddr);
 
 		if (!pdev->rx_ring.target_idx.vaddr)
-			goto fail2;
+			goto fail1;
 
 		pdev->rx_ring.target_idx.paddr = paddr;
 		*pdev->rx_ring.target_idx.vaddr = 0;
@@ -3371,7 +3368,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 			 pdev->rx_ring.size * ring_elem_size,
 			 &paddr);
 	if (!pdev->rx_ring.buf.paddrs_ring)
-		goto fail3;
+		goto fail2;
 
 	pdev->rx_ring.base_paddr = paddr;
 	pdev->rx_ring.alloc_idx.vaddr =
@@ -3380,7 +3377,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 			 sizeof(uint32_t), &paddr);
 
 	if (!pdev->rx_ring.alloc_idx.vaddr)
-		goto fail4;
+		goto fail3;
 
 	pdev->rx_ring.alloc_idx.paddr = paddr;
 	*pdev->rx_ring.alloc_idx.vaddr = 0;
@@ -3449,7 +3446,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 
 	return 0;               /* success */
 
-fail4:
+fail3:
 	qdf_mem_free_consistent(pdev->osdev, pdev->osdev->dev,
 				   pdev->rx_ring.size * sizeof(target_paddr_t),
 				   pdev->rx_ring.buf.paddrs_ring,
@@ -3457,8 +3454,8 @@ fail4:
 				   qdf_get_dma_mem_context((&pdev->rx_ring.buf),
 							   memctx));
 
-fail3:
-	if (pdev->cfg.is_full_reorder_offload)
+fail2:
+	if (pdev->cfg.is_full_reorder_offload) {
 		qdf_mem_free_consistent(pdev->osdev, pdev->osdev->dev,
 					   sizeof(uint32_t),
 					   pdev->rx_ring.target_idx.vaddr,
@@ -3467,12 +3464,10 @@ fail3:
 								    rx_ring.
 								    target_idx),
 								   memctx));
-	else
-		qdf_mem_free(pdev->rx_ring.buf.netbufs_ring);
-
-fail2:
-	if (pdev->cfg.is_full_reorder_offload)
 		htt_rx_hash_deinit(pdev);
+	} else {
+		qdf_mem_free(pdev->rx_ring.buf.netbufs_ring);
+	}
 
 fail1:
 	return 1;               /* failure */
