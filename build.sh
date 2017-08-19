@@ -13,7 +13,7 @@ DEFCONFIG="lightning_defconfig"
 
 # Kernel Details
 VER=Lightning-Kernel-V8
-VARIANT="OP5-LOS-N-V8"
+VARIANT="OP5-LOS-N-V9"
 
 # Vars
 export LOCALVERSION=~`echo $VER`
